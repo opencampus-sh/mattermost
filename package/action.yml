@@ -1,0 +1,6 @@
+name: "Package"
+
+runs:
+  using: 'docker'
+  image: '../../server/build/Dockerfile.buildenv'
+  entrypoint: './patch/package/main.sh'

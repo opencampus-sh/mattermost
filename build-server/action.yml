@@ -1,0 +1,6 @@
+name: "Build Server"
+
+runs:
+  using: 'docker'
+  image: '../../server/build/Dockerfile.buildenv'
+  entrypoint: './patch/build-server/main.sh'
