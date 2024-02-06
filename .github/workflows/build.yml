@@ -1,0 +1,36 @@
+on: [push, workflow_dispatch]
+
+env:
+  VERSION: v9.7.1
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mattermost
+        uses: actions/checkout@v4
+        with:
+          repository: mattermost/mattermost
+          ref: ${{ env.VERSION }}
+
+      - name: Checkout patches
+        uses: actions/checkout@v4
+        with:
+          path: patch
+
+      - name: Apply patches
+        run: for i in ./patch/*.patch; do patch -p1 < "$i"; done
+
+      - name: Build server
+        uses: ./patch/build-server
+
+      - name: Build client
+        uses: ./patch/build-client
+
+      - name: Package
+        uses: ./patch/package
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: server/dist/mattermost-team-linux-amd64.tar.gz

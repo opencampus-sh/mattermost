@@ -1,0 +1,6 @@
+name: "Build Client"
+
+runs:
+  using: 'docker'
+  image: '../../webapp/channels/build/Dockerfile'
+  entrypoint: './patch/build-client/main.sh'
