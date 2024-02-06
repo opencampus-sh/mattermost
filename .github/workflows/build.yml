@@ -1,0 +1,82 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build server
+        uses: ./.github/actions/build-server
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-artifacts
+          path: server/bin
+
+  build-client:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build client
+        uses: ./.github/actions/build-client
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-artifacts
+          path: webapp/channels/dist
+
+  package:
+    runs-on: ubuntu-latest
+    needs:
+      - build-server
+      - build-client
+#    outputs:
+#      package-url: ${{ steps.package-upload.outputs.artifact-url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: server-artifacts
+          path: server/bin
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-artifacts
+          path: webapp/channels/dist
+
+      - name: Package
+        uses: ./.github/actions/package
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+#        id: package-upload
+        with:
+          name: package-artifacts
+          path: server/dist/mattermost-team-linux-amd64.tar.gz
+
+  container:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-artifacts
+          path: server/dist
+
+#      - run: docker build --build-arg MM_PACKAGE=${{ needs.package.outputs.package-url }} ./server/build
+      - run: docker build ./server/build
