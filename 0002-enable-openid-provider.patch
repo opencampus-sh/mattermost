@@ -1,0 +1,27 @@
+Import openid oauthprovider and enable in non-enterprise version.
+
+--- a/server/cmd/mattermost/main.go
++++ b/server/cmd/mattermost/main.go
+@@ -11,6 +11,7 @@ import (
+ 	_ "github.com/mattermost/mattermost/server/v8/channels/app/slashcommands"
+ 	// Plugins
+ 	_ "github.com/mattermost/mattermost/server/v8/channels/app/oauthproviders/gitlab"
++	_ "github.com/mattermost/mattermost/server/v8/channels/app/oauthproviders/openid"
+ 
+ 	// Enterprise Imports
+ 	_ "github.com/mattermost/mattermost/server/v8/enterprise"
+--- a/server/config/client.go
++++ b/server/config/client.go
+@@ -326,9 +326,9 @@ func GenerateLimitedClientConfig(c *model.Config, telemetryID string, license *m
+ 	props["SamlLoginButtonTextColor"] = ""
+ 	props["EnableSignUpWithGoogle"] = "false"
+ 	props["EnableSignUpWithOffice365"] = "false"
+-	props["EnableSignUpWithOpenId"] = "false"
+-	props["OpenIdButtonText"] = ""
+-	props["OpenIdButtonColor"] = ""
++	props["EnableSignUpWithOpenId"] = strconv.FormatBool(*c.OpenIdSettings.Enable)
++	props["OpenIdButtonColor"] = *c.OpenIdSettings.ButtonColor
++	props["OpenIdButtonText"] = *c.OpenIdSettings.ButtonText
+ 	props["CWSURL"] = ""
+ 	props["EnableCustomBrand"] = strconv.FormatBool(*c.TeamSettings.EnableCustomBrand)
+ 	props["CustomBrandText"] = *c.TeamSettings.CustomBrandText
