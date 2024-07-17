@@ -21,6 +21,9 @@ jobs:
       - name: Apply patches
         run: for i in ./patch/*.patch; do patch -p1 < "$i"; done
 
+      - name: Add overlay
+        run: cp -R ./patch/overlay/* ./
+
       - name: Build server
         uses: ./patch/build-server
 
