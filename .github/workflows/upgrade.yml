@@ -43,5 +43,10 @@ jobs:
           git push --force -u origin '${{ env.UPGRADE_BRANCH }}'
 
           # Edit pull request when it already exists otherwise create a new one
-          gh pr edit '${{ env.UPGRADE_BRANCH }}' --title "$msg" ||
-          gh pr create --head '${{ env.UPGRADE_BRANCH }}' --body '' --title "$msg"
+          number=$(gh pr list --limit 1 --head '${{ env.UPGRADE_BRANCH }}' --state open --json number -q '.[0].number // ""')
+          echo "$number"
+          if [ -n "$number" ]; then
+            gh pr edit '${{ env.UPGRADE_BRANCH }}' --title "$msg"
+          else
+            gh pr create --head '${{ env.UPGRADE_BRANCH }}' --body '' --title "$msg"
+          fi
