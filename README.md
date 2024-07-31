@@ -3,8 +3,7 @@ applied.
 
 ## Usage
 
-The upstream mettermost version is specified in
-`.github/workflows/build.yml` with the `VERSION` variable.
+The upstream mettermost version is specified in the `VERSION` file.
 All patch files (files ending with .patch) in the root directory of the
 repository are applied onto the specified mattermost version. When
 adding new patches or changing them please make sure a description

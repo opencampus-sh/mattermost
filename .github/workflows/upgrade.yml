@@ -1,0 +1,47 @@
+name: Auto upgrade checker
+
+on:
+  schedule:
+    - cron:  '0 9 * * *'
+  workflow_dispatch:
+
+env:
+  UPGRADE_BRANCH: mattermost-upgrade
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch latest version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch the tag_name of the latest mattermost release
+          gh api repos/mattermost/mattermost/releases/latest -q '.tag_name' > VERSION
+          # Check if it has changed
+          echo "changed=$(git diff --quiet || echo true)" >> "$GITHUB_OUTPUT"
+
+      - name: Create upgrade pull request
+        if: steps.version.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Commit changes on a new branch
+          msg="Upgrade mattermost to $(cat VERSION)"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -b '${{ env.UPGRADE_BRANCH }}'
+          git commit -am "$msg"
+          git push --force -u origin '${{ env.UPGRADE_BRANCH }}'
+
+          # Edit pull request when it already exists otherwise create a new one
+          gh pr edit '${{ env.UPGRADE_BRANCH }}' --title "$msg" ||
+          gh pr create --head '${{ env.UPGRADE_BRANCH }}' --body '' --title "$msg"

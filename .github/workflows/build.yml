@@ -1,17 +1,30 @@
 on: [push, workflow_dispatch]
 
-env:
-  VERSION: v9.7.1
+permissions: read-all
 
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout version
+        uses: actions/checkout@v4
+        with:
+          path: tmp
+          sparse-checkout: VERSION
+          sparse-checkout-cone-mode: false
+
+      - name: Read version
+        id: version
+        run: |
+          echo "version=$(cat tmp/VERSION)" >> "$GITHUB_OUTPUT"
+          # Need an empty directory for next step
+          rm -rf tmp
+
       - name: Checkout mattermost
         uses: actions/checkout@v4
         with:
           repository: mattermost/mattermost
-          ref: ${{ env.VERSION }}
+          ref: ${{ steps.version.outputs.version }}
 
       - name: Checkout patches
         uses: actions/checkout@v4
