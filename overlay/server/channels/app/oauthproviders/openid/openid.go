@@ -198,6 +198,7 @@ func (o *OpenIdProvider) createUserFromKeycloakData(c request.CTX, oid *OpenIdUs
 
     c.Logger().Info("Created new Mattermost account from Keycloak", mlog.String("user_id", createdUser.Id))
     return createdUser, nil
+
 }
 
 func (o *OpenIdProvider) combineUsers(jsonUser *model.User, tokenUser *model.User) *model.User {
