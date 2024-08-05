@@ -222,6 +222,11 @@ func (o *OpenIdProvider) GetUserFromIdToken(c request.CTX, idToken string) (*mod
 }
 
 func (o *OpenIdProvider) IsSameUser(_ request.CTX, dbUser, oauthUser *model.User) bool {
+	// Combine users with same email
+	if dbUser.Email == oauthUser.Email {
+		return true
+	}
+
 	// Office365 OAuth would store Ids without dashes. (ie. 0e8fddd450d344999a93a390ee8cb83d)
 	// Office365 OpenId will return as a formatted GUID (ie. '0e8fddd4-50d3-4499-9a93-a390ee8cb83d')
 	// If this is a UUID that starts with all zero. (ie. 00000000-0000-0000-be95-fe607df5dbeb)
