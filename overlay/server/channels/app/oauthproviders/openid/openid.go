@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -18,6 +19,8 @@ import (
 	"github.com/mattermost/mattermost/server/public/shared/mlog"
 	"github.com/mattermost/mattermost/server/public/shared/request"
 	"github.com/mattermost/mattermost/server/v8/einterfaces"
+
+	"github.com/mattermost/mattermost/server/v8/channels/app"
 )
 
 type CacheData struct {
@@ -36,7 +39,8 @@ type OpenIdMetadata struct {
 }
 
 type OpenIdProvider struct {
-	CacheData *CacheData
+	CacheData   *CacheData
+	userService app.UserService
 }
 
 type OpenIdUser struct {
@@ -110,14 +114,92 @@ func (u *OpenIdUser) GetIdentifier() string {
 func (o *OpenIdProvider) GetUserFromJSON(c request.CTX, data io.Reader, tokenUser *model.User) (*model.User, error) {
 	oid, err := openIDUserFromJSON(data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing Keycloak user data: %w", err)
 	}
-	jsonUser := o.userFromOpenIdUser(c.Logger(), oid)
 
-	if tokenUser != nil {
-		jsonUser = o.combineUsers(jsonUser, tokenUser)
+	// Use the Keycloak user ID directly as the auth data
+	authData := oid.Id
+
+	// Try to find user by Keycloak ID first
+	user, err := o.userService.GetUserByAuth(c, authData, o.CacheData.Service)
+	if err != nil && !model.IsErrNotFound(err) {
+		return nil, fmt.Errorf("error checking for existing user by auth data: %w", err)
 	}
-	return jsonUser, nil
+
+	if user == nil {
+		// If not found by Keycloak ID, try to find by email
+		user, err = o.userService.GetUserByEmail(c, oid.Email)
+		if err != nil && !model.IsErrNotFound(err) {
+			return nil, fmt.Errorf("error checking for existing user by email: %w", err)
+		}
+	}
+
+	if user != nil {
+		// User exists, update with Keycloak data
+		if user.AuthService != o.CacheData.Service {
+			c.Logger().Info("Linking existing Mattermost account to Keycloak",
+				mlog.String("user_id", user.Id),
+				mlog.String("previous_auth_service", user.AuthService))
+		}
+		return o.updateUserWithKeycloakData(c, user, oid, authData)
+	}
+
+	// User doesn't exist, create new user
+	return o.createUserFromKeycloakData(c, oid, authData)
+}
+
+func (o *OpenIdProvider) updateUserWithKeycloakData(c request.CTX, existingUser *model.User, oid *OpenIdUser, authData string) (*model.User, error) {
+	previousEmail := existingUser.Email
+	previousAuthService := existingUser.AuthService
+
+	existingUser.FirstName = oid.FirstName
+	existingUser.LastName = oid.LastName
+	existingUser.Nickname = oid.Nickname
+	existingUser.Email = oid.Email
+	existingUser.EmailVerified = true
+	existingUser.AuthData = &authData
+	existingUser.AuthService = o.CacheData.Service
+
+	updatedUser, err := o.userService.UpdateUser(c, existingUser, false)
+	if err != nil {
+		return nil, fmt.Errorf("error updating existing user with Keycloak data: %w", err)
+	}
+
+	if previousEmail != oid.Email {
+		c.Logger().Info("User email updated from Keycloak",
+			mlog.String("user_id", updatedUser.Id),
+			mlog.String("previous_email", previousEmail),
+			mlog.String("new_email", oid.Email))
+	}
+
+	if previousAuthService != o.CacheData.Service {
+		c.Logger().Info("User auth service updated to Keycloak",
+			mlog.String("user_id", updatedUser.Id),
+			mlog.String("previous_auth_service", previousAuthService))
+	}
+
+	return updatedUser, nil
+}
+
+func (o *OpenIdProvider) createUserFromKeycloakData(c request.CTX, oid *OpenIdUser, authData string) (*model.User, error) {
+	newUser := &model.User{
+		Email:         oid.Email,
+		FirstName:     oid.FirstName,
+		LastName:      oid.LastName,
+		Nickname:      oid.Nickname,
+		EmailVerified: true,
+		AuthData:      &authData,
+		AuthService:   o.CacheData.Service,
+	}
+
+	createdUser, err := o.userService.CreateUser(c, newUser)
+	if err != nil {
+		return nil, fmt.Errorf("error creating new user from Keycloak data: %w", err)
+	}
+
+	c.Logger().Info("Created new Mattermost account from Keycloak", mlog.String("user_id", createdUser.Id))
+	return createdUser, nil
+
 }
 
 func (o *OpenIdProvider) combineUsers(jsonUser *model.User, tokenUser *model.User) *model.User {
