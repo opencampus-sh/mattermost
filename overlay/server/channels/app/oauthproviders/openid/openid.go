@@ -122,14 +122,14 @@ func (o *OpenIdProvider) GetUserFromJSON(c request.CTX, data io.Reader, tokenUse
 
 	// Try to find user by Keycloak ID first
 	user, err := o.userService.GetUserByAuth(c, authData, o.CacheData.Service)
-	if err != nil && !model.IsErrNoRows(err) {
+	if err != nil && !model.IsErrNotFound(err) {
 		return nil, fmt.Errorf("error checking for existing user by auth data: %w", err)
 	}
 
 	if user == nil {
 		// If not found by Keycloak ID, try to find by email
 		user, err = o.userService.GetUserByEmail(c, oid.Email)
-		if err != nil && !model.IsErrNoRows(err) {
+		if err != nil && !model.IsErrNotFound(err) {
 			return nil, fmt.Errorf("error checking for existing user by email: %w", err)
 		}
 	}
